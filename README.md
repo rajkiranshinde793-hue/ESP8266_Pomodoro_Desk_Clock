@@ -1,6 +1,6 @@
 # ESP8266 Pomodoro Desk Clock
 
-A professional productivity desk clock built with the ESP8266 (NodeMCU) and PlatformIO. It features a precise NTP-synced clock and a built-in Pomodoro timer to manage focus sessions.
+A professional productivity desk clock built with the ESP8266 (NodeMCU). It features a precise NTP-synced clock and a built-in Pomodoro timer to manage focus sessions.
 
 ## Features
 * **WiFi & NTP Sync:** Automatically fetches precise time from `pool.ntp.org`.

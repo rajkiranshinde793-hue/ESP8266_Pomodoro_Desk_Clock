@@ -7,14 +7,9 @@
 #include <EEPROM.h>
 #include <Wire.h> 
 
-
 #include "Config.h"
 #include "wifi_cred.h"  
-
-// Required for Sleep Functions & CPU Freq 
-extern "C" {
-  #include "user_interface.h"
-}
+#include "GoogleLogger.h"
 
 // Custom Fonts 
 #include <Fonts/FreeSansBold9pt7b.h>
@@ -41,7 +36,7 @@ int sessionCount = 0;
 unsigned long lastSyncTime = 0;
 unsigned long wifiConnectStartTime = 0;
 
-// --- FUNCTION PROTOTYPES (REQUIRED FOR PLATFORMIO) ---
+// --- FUNCTION PROTOTYPES ---
 void setBrightness();
 void killWiFi();
 void wakeWiFi();
@@ -50,7 +45,6 @@ void saveSession();
 void clearSessions();
 void handleNetwork();
 void handleButton();
-void smartSleep(unsigned long ms);
 void drawClock();
 void drawPomodoro();
 
@@ -71,23 +65,22 @@ void setBrightness() {
 void killWiFi() {
   WiFi.disconnect(true);  
   WiFi.mode(WIFI_OFF);    
-  WiFi.forceSleepBegin(); 
+  WiFi.forceSleepBegin(); // Forces RF hardware to sleep (Duty Cycle OFF)
   delay(1);
 }
 
 void wakeWiFi() {
-  WiFi.forceSleepWake();  
+  WiFi.forceSleepWake();  // Wakes RF hardware (Duty Cycle ON)
   delay(1);               
   WiFi.mode(WIFI_STA);    
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD); // Using constants from Secrets.h
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD); 
 }
 
 void setup() {
+  // Set CPU to 80MHz (Good balance for standard running)
   system_update_cpu_freq(80);
   Serial.begin(9600);
   
-  wifi_set_sleep_type(LIGHT_SLEEP_T); 
-
   EEPROM.begin(4); 
   sessionCount = EEPROM.read(EEPROM_ADDR);
   if (sessionCount > MAX_SESSIONS) sessionCount = 0;
@@ -253,41 +246,26 @@ void handleButton() {
   lastButtonState = currentButtonState;
 }
 
-void smartSleep(unsigned long ms) {
-  unsigned long start = millis();
-  while (millis() - start < ms) {
-    handleButton();
-    handleNetwork(); 
-    
-    if (netState != NET_IDLE) {
-       delay(10);
-    } else {
-       delay(50);
-    }
-
-    if (currentMode != CLOCK) return;
-  }
-}
-
 void loop() {
-  unsigned long loopStart = millis();
-
-  display.clearDisplay();
+  handleButton();
+  handleNetwork();
 
   if (currentMode == CLOCK) {
-    drawClock();
-    handleNetwork();
-    unsigned long executionTime = millis() - loopStart;
-    if (executionTime < 1000) {
-      smartSleep(1000 - executionTime);
+    // Non-blocking display update (every 1 second)
+    static unsigned long lastUpdate = 0;
+    if (millis() - lastUpdate >= 1000) {
+       lastUpdate = millis();
+       display.clearDisplay();
+       drawClock();
+       display.display();
     }
   } else {
-    handleButton();
+    // Pomodoro Mode - update frequently for responsiveness
+    display.clearDisplay();
     drawPomodoro();
-    delay(10); 
+    display.display();
+    delay(10); // Small delay to prevent WDT reset
   }
-
-  display.display();
 }
 
 void drawClock() {
@@ -324,17 +302,26 @@ void drawClock() {
   char dateBuffer[10];
   snprintf(dateBuffer, sizeof(dateBuffer), "%02d/%02d", ti->tm_mday, ti->tm_mon + 1);
   display.print(dateBuffer);
-
 }
 
 void drawPomodoro() {
   unsigned long elapsed = (millis() - timerStartTime) / 1000;
   if (elapsed >= timerDuration) {
     if (currentMode == FOCUS) {
+
+      display.clearDisplay();
+      display.setCursor(10, 35);
+      display.println("Logging...");
+      display.display();
+
+      logToGoogle("Focus", 25);
+
       currentMode = BREAK;
       timerDuration = 5 * 60; 
       timerStartTime = millis();
       triggerBuzzer(2);
+      
+      killWiFi();
     } else {
       saveSession();
       currentMode = CLOCK;
@@ -347,15 +334,33 @@ void drawPomodoro() {
   int mins = remaining / 60;
   int secs = remaining % 60;
 
-  display.setFont();
+  display.setFont(); // Switch to default small font for headers
+  
+  // Left: Mode Title
   display.setCursor(0, 0);
   display.print(currentMode == FOCUS ? "FOCUSING" : "BREAK TIME");
 
+  // Right: Current Time (HH:MM)
+  int pHours = timeClient.getHours();
+  int pDisplayHours = pHours % 12;
+  if (pDisplayHours == 0) pDisplayHours = 12;
+  
+  char smallTimeBuf[6];
+  snprintf(smallTimeBuf, sizeof(smallTimeBuf), "%d:%02d", pDisplayHours, timeClient.getMinutes());
+  
+  // Align to right edge (approx width calculation)
+  // 128 - (length * 6 pixels)
+  int xPos = 128 - (strlen(smallTimeBuf) * 6);
+  display.setCursor(xPos, 0);
+  display.print(smallTimeBuf);
+
+  // Main Timer Font
   display.setFont(&FreeSansBold12pt7b);
   display.setCursor(25, 40);
   char timerBuf[10];
   snprintf(timerBuf, sizeof(timerBuf), "%02d:%02d", mins, secs);
   display.print(timerBuf);
+  
   int progressWidth = map(elapsed, 0, timerDuration, 0, 128);
   display.drawRect(0, 55, 128, 7, SSD1306_WHITE);
   display.fillRect(0, 55, progressWidth, 7, SSD1306_WHITE);

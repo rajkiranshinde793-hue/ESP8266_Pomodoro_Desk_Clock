@@ -8,8 +8,9 @@
 #include <Wire.h> 
 
 #include "Config.h"
-#include "wifi_cred.h"  
+#include "credentials.h"  
 #include "GoogleLogger.h"
+#include "DNDControl.h"
 
 // Custom Fonts 
 #include <Fonts/FreeSansBold9pt7b.h>
@@ -233,6 +234,7 @@ void handleButton() {
         currentMode = CLOCK;
         timerStartTime = 0;
         triggerBuzzer(2, 100);
+        queueDNDChange(false);
       }
     } else if (pressDuration > 50) {
       if (currentMode == CLOCK) {
@@ -240,6 +242,7 @@ void handleButton() {
         timerDuration = 25 * 60; 
         timerStartTime = now;
         triggerBuzzer(1); 
+        queueDNDChange(true);
       }
     }
   }
@@ -249,6 +252,8 @@ void handleButton() {
 void loop() {
   handleButton();
   handleNetwork();
+
+  handleDNDBackground();
 
   if (currentMode == CLOCK) {
     // Non-blocking display update (every 1 second)
@@ -315,6 +320,7 @@ void drawPomodoro() {
       display.display();
 
       logToGoogle("Focus", 25);
+      queueDNDChange(false);
 
       currentMode = BREAK;
       timerDuration = 5 * 60; 

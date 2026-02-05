@@ -3,12 +3,9 @@
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecure.h>
 
-// 1. INCLUDE YOUR WIFI CREDENTIALS
-#include "wifi_cred.h" 
+#include "credentials.h" 
 
-// 2. PASTE YOUR WEB APP URL HERE (Make sure it ends in /exec)
-const char* GOOGLE_SCRIPT_URL = "Paste your Web Url"; 
-
+ 
 void ensureWiFiConnected() {
     if (WiFi.status() == WL_CONNECTED) {
         return;

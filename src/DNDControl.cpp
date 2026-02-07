@@ -71,7 +71,12 @@ void handleDNDBackground() {
                 
                 Serial.printf("[DND] Result: %d\n", code);
             }
-            dndState = DND_IDLE; // Job Done!
+            WiFi.disconnect(true);
+            WiFi.mode(WIFI_OFF);
+            WiFi.forceSleepBegin();
+            delay(1); 
+            
+            dndState = DND_IDLE; 
             break;
     }
 }

@@ -17,6 +17,7 @@
 #include <Fonts/FreeMono9pt7b.h>
 #include <Fonts/FreeSansBold12pt7b.h>
 
+
 // --- OBJECT INITIALIZATION ---
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 WiFiUDP ntpUDP;
@@ -81,6 +82,11 @@ void setup() {
   // Set CPU to 80MHz (Good balance for standard running)
   system_update_cpu_freq(80);
   Serial.begin(9600);
+  
+  WiFi.mode(WIFI_OFF); 
+  WiFi.forceSleepBegin();
+  delay(1);
+  WiFi.setSleepMode(WIFI_LIGHT_SLEEP);
   
   EEPROM.begin(4); 
   sessionCount = EEPROM.read(EEPROM_ADDR);
@@ -264,6 +270,14 @@ void loop() {
        drawClock();
        display.display();
     }
+
+       if (netState == NET_IDLE) {
+       // Sleep for 50ms. The CPU halts here, saving power.
+       delay(50); 
+       } else {
+       delay(1); 
+       }
+
   } else {
     // Pomodoro Mode - update frequently for responsiveness
     display.clearDisplay();

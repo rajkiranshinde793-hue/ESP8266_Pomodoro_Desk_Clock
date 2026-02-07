@@ -75,4 +75,11 @@ void logToGoogle(String type, int durationMinutes) {
     } else {
         Serial.println("[Logger] Error: WiFi not connected, cannot log.");
     }
+
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    WiFi.forceSleepBegin();
+    delay(1);
+    Serial.println("[Logger] WiFi Powered Down.");
+    
 }
